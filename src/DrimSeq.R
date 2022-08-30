@@ -62,12 +62,12 @@ metadata <- vroom("data/subset_metadata.tsv") %>%
   arrange(match(run, run_names)) %>%
   mutate(group = as.factor(tolower_subtype)) %>%
   rename(sample_id = run) %>%
-  dplyr::select(sample_id, group) %>%
+  dplyr::select(sample_id, group, age, histology, sex) %>%
   as.data.frame()
 
-counts <- get_count_df(filenames)
+counts_df <- get_count_df(filenames)
 
-d <- dmDSdata(counts = counts, samples = metadata)
+d <- dmDSdata(counts = counts_df, samples = metadata)
 
 # Apenas transcritos com pelo menos 10 counts em 4 amostras
 # E apenas genes com pelo menos 10 counts em 8 amostras (todas)
@@ -80,7 +80,8 @@ d <-
     min_feature_expr = 10
   )
 
-design_full <- model.matrix( ~ group, data = d@samples)
+# Add histology later
+design_full <- model.matrix(~ age + sex + group, data = d@samples)
 
 set.seed(1024)
 d <- dmPrecision(d,
@@ -95,8 +96,7 @@ d <-
     BPPARAM = MulticoreParam(2)
   )
 
-# saveRDS(d, "results/dmDSfit.rds")
-d <- readRDS("results/dmDSfit.rds")
+saveRDS(d, "results/dmDSfit.rds")
 
 d <-
   dmTest(d,
