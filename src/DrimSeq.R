@@ -7,7 +7,10 @@ library(dplyr)
 
 get_files <- function(gse_id) {
   list.files(
-    paste0("data/", gse_id),
+    paste0(
+      "/storages/parnamirim/iarasouza/curso_rnaseq/lung/preprocess/",
+      gse_id
+    ),
     pattern =  ".h5",
     full.names = TRUE,
     recursive = TRUE
@@ -18,9 +21,17 @@ get_count_df <- function(filenames) {
   gtf <- "data/Homo_sapiens.GRCh38.97.chr_patch_hapl_scaff.gtf.gz"
   txdb.filename <-
     "Homo_sapiens.GRCh38.97.chr_patch_hapl_scaff.gtf.sqlite"
-  txdb.filepath <- paste0("data/", txdb.filename)
+  txdb.filepath <-
+    paste0(
+      "/storages/parnamirim/iarasouza/curso_rnaseq/lung/curso/dados_curso/inputs/",
+      txdb.filename
+    )
 
-  if (!(txdb.filename %in% list.files("data"))) {
+  if (!(
+    txdb.filename %in% list.files(
+      "/storages/parnamirim/iarasouza/curso_rnaseq/lung/curso/dados_curso/inputs"
+    )
+  )) {
     txdb <- GenomicFeatures::makeTxDbFromGFF(gtf, format = "gtf")
     AnnotationDbi::saveDb(txdb, txdb.filename)
   }
@@ -40,8 +51,7 @@ get_count_df <- function(filenames) {
 
   counts <- tximport(files = filenames,
                      type = "kallisto",
-                     txOut = TRUE,
-  )
+                     txOut = TRUE,)
 
   as.data.frame(counts$counts) %>%
     setNames(run_names) %>%
@@ -53,14 +63,17 @@ get_count_df <- function(filenames) {
                   gene_id = gene)
 }
 
-filenames <- get_files("subset")
+filenames <- get_files("kallisto")
 run_names <-
   stringr::str_extract_all(filenames, "SRR\\d+", simplify = TRUE)
 
-metadata <- vroom("data/subset_metadata.tsv") %>%
+metadata <-
+  vroom(
+    "/storages/parnamirim/iarasouza/curso_rnaseq/lung/curso/dados_curso/inputs/metadata.csv"
+  ) %>%
   janitor::clean_names() %>%
   arrange(match(run, run_names)) %>%
-  mutate(group = as.factor(tolower_subtype)) %>%
+  mutate(group = as.factor(subtype)) %>%
   rename(sample_id = run) %>%
   dplyr::select(sample_id, group, age, histology, sex) %>%
   as.data.frame()
@@ -81,28 +94,28 @@ d <-
     min_feature_expr = 10
   )
 
-# Add histology later
-design_full <- model.matrix(~ age + sex + group, data = d@samples)
+design_full <-
+  model.matrix( ~ age + sex + histology + group, data = d@samples)
 
 set.seed(1024)
 d <- dmPrecision(d,
                  design = design_full,
-                 BPPARAM = MulticoreParam(3))
+                 BPPARAM = MulticoreParam())
 
 d <-
-  dmFit(
-    d,
-    design = design_full,
-    verbose = 1,
-    BPPARAM = MulticoreParam(2)
-  )
+  dmFit(d,
+        design = design_full,
+        verbose = 1,
+        BPPARAM = MulticoreParam())
 
-saveRDS(d, "results/dmDSfit.rds")
+saveRDS(d,
+        "/data/home/joaovitor.cavalcante/curso_rnaseq/results/dmDSfit.rds")
 
 d <-
   dmTest(d,
          coef = "groupinvasive",
          verbose = 1,
-         BPPARAM = MulticoreParam(3))
+         BPPARAM = MulticoreParam())
 
-saveRDS(d, "results/drimseq_results.rds")
+saveRDS(d,
+        "/data/home/joaovitor.cavalcante/curso_rnaseq/results/drimseq_results.rds")
