@@ -5,11 +5,11 @@ library(vroom)
 library(dplyr)
 
 
-get_files <- function(gse_id) {
+get_files <- function(kallisto_foldername) {
   list.files(
     paste0(
       "/storages/parnamirim/iarasouza/curso_rnaseq/lung/preprocess/",
-      gse_id
+      kallisto_foldername
     ),
     pattern =  ".h5",
     full.names = TRUE,
