@@ -18,40 +18,15 @@ get_files <- function(gse_id) {
 }
 
 get_count_df <- function(filenames) {
-  gtf <- "data/Homo_sapiens.GRCh38.97.chr_patch_hapl_scaff.gtf.gz"
-  txdb.filename <-
-    "Homo_sapiens.GRCh38.97.chr_patch_hapl_scaff.gtf.sqlite"
-  txdb.filepath <-
-    paste0(
-      "/storages/parnamirim/iarasouza/curso_rnaseq/lung/curso/dados_curso/inputs/",
-      txdb.filename
+  tx2gene <-
+    vroom(
+      "/storages/parnamirim/iarasouza/curso_rnaseq/lung/curso/dados_curso/inputs/tx2gene.tsv"
     )
-
-  if (!(
-    txdb.filename %in% list.files(
-      "/storages/parnamirim/iarasouza/curso_rnaseq/lung/curso/dados_curso/inputs"
-    )
-  )) {
-    txdb <- GenomicFeatures::makeTxDbFromGFF(gtf, format = "gtf")
-    AnnotationDbi::saveDb(txdb, txdb.filename)
-  }
-
-  # Carregar txdb
-  txdb <- AnnotationDbi::loadDb(txdb.filepath)
-  txdf <-
-    AnnotationDbi::select(txdb, keys(txdb, "GENEID"), "TXNAME", "GENEID")
-  tab <- table(txdf$GENEID)
-  txdf$ntx <- tab[match(txdf$GENEID, names(tab))]
-  tx2gene <- data.frame(
-    tx = txdf$TXNAME,
-    gene = txdf$GENEID,
-    stringsAsFactors = F
-  )
-
 
   counts <- tximport(files = filenames,
                      type = "kallisto",
-                     txOut = TRUE,)
+                     txOut = TRUE,
+  )
 
   as.data.frame(counts$counts) %>%
     setNames(run_names) %>%
@@ -95,7 +70,7 @@ d <-
   )
 
 design_full <-
-  model.matrix( ~ age + sex + histology + group, data = d@samples)
+  model.matrix(~ age + sex + histology + group, data = d@samples)
 
 set.seed(1024)
 d <- dmPrecision(d,
