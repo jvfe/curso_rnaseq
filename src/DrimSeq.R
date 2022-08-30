@@ -75,13 +75,14 @@ design_full <-
 set.seed(1024)
 d <- dmPrecision(d,
                  design = design_full,
-                 BPPARAM = MulticoreParam())
+                 verbose = 1
+                 )
 
 d <-
   dmFit(d,
         design = design_full,
-        verbose = 1,
-        BPPARAM = MulticoreParam())
+        verbose = 1
+       )
 
 saveRDS(d,
         "/data/home/joaovitor.cavalcante/curso_rnaseq/results/dmDSfit.rds")
@@ -89,8 +90,8 @@ saveRDS(d,
 d <-
   dmTest(d,
          coef = "groupinvasive",
-         verbose = 1,
-         BPPARAM = MulticoreParam())
+         verbose = 1
+         )
 
 saveRDS(d,
         "/data/home/joaovitor.cavalcante/curso_rnaseq/results/drimseq_results.rds")
