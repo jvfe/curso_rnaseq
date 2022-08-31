@@ -65,7 +65,8 @@ metadata <- vroom("data/subset_metadata.tsv") %>%
   dplyr::select(sample_id, group, age, histology, sex) %>%
   as.data.frame()
 
-counts_df <- get_count_df(filenames)
+counts_df <- get_count_df(filenames) %>%
+  filter(if_all(starts_with("SRR"), ~ .x > 0))
 
 d <- dmDSdata(counts = counts_df, samples = metadata)
 
