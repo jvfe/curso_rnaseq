@@ -70,7 +70,7 @@ d <-
   )
 
 design_full <-
-  model.matrix(~ age + sex + histology + group, data = d@samples)
+  model.matrix(~ group, data = d@samples)
 
 set.seed(1024)
 d <- dmPrecision(d,
