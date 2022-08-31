@@ -44,7 +44,7 @@ run_names <-
 
 metadata <-
   vroom(
-    "/storages/parnamirim/iarasouza/curso_rnaseq/lung/curso/dados_curso/inputs/metadata.csv"
+    "/storages/parnamirim/iarasouza/curso_rnaseq/lung/curso/dados_curso/inputs/metadata/metadata.csv"
   ) %>%
   janitor::clean_names() %>%
   arrange(match(run, run_names)) %>%
