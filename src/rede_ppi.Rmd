@@ -1,0 +1,71 @@
+---
+title: "Rede PPI"
+author: "João Vitor F. Cavalcante"
+date: '`r Sys.Date()`'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(RCurl)
+library(dplyr)
+library(igraph)
+library(RedeR)
+```
+
+# Introdução
+
+O processo de montar uma rede de interação proteína-proteína consiste de, partindo de uma lista de genes, por exemplo os genes diferencialmente expressos que encontramos, buscar suas proteínas correspondentes 
+no banco de dados STRINGdb, que cataloga e classifica interações proteicas de acordo com diferentes metodologias, desde ensaios bioquímicas à análises de co-ocorrência na literatura.
+
+A função abaixo busca os identificadores de gene dados como input no banco e retorna as interações de suas proteínas.
+
+```{r}
+get_map <- function(ids) {
+  read.table(
+    text = postForm(
+      "https://string-db.org/api/tsv/network",
+      identifiers = ids,
+      echo_query  = "1",
+      required_score = "0",
+      show_query_node_labels = "1",
+      species = "9606"
+    )[[1]],
+    sep = "\t",
+    header = T
+  )
+}
+```
+
+Vamos adquirir a rede completa para o nosso conjunto de genes:
+
+```{r}
+expression <- readr::read_csv("results/GSE116127.csv")
+
+interaction <- get_map(expression$hgnc_symbol)
+
+```
+
+Podemos filtrar apenas as interações com `score` mais alto:
+
+```{r}
+interaction_filtrado <- interaction %>% 
+  filter(score > 0.9) %>% 
+  dplyr::select(preferredName_A, preferredName_B)
+```
+
+
+E. por fim, podemos plotar a rede que encontramos no RedeR:
+
+```{r}
+g <- graph_from_edgelist(as.matrix(interaction_filtrado), directed = F)
+
+rdp <- RedeR::RedPort()
+calld(rdp)
+addGraph(rdp, g)
+
+```
+

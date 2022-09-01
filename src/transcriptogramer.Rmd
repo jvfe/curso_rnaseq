@@ -1,0 +1,116 @@
+---
+title: "Transcriptogramer"
+author: "João Vitor F. Cavalcante"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Transcriptogramer
+
+A biblioteca Bioconductor chamada transcriptogramer realiza análise transcricional baseada em transcriptogramas, isto é, ela projeta os valores de expressão dos genes num conjunto de
+proteínas ordenadas, de forma que a probabilidade que os produtos desses genes participem
+na mesma via metabólica ou processo biológico diminui com o aumento da distância entre
+proteínas do ordenamento. Este procedimento possibilita uma análise global do metabolismo celular
+enquanto também aponta que conjuntos de genes estão alterados.
+
+
+```{r}
+library(transcriptogramer)
+library(tximport)
+library(biomaRt)
+library(dplyr)
+```
+
+Vamos ler a tabela de contagens:
+
+```{r}
+
+filenames <- list.files(
+    "data/subset",
+    pattern =  ".h5",
+    full.names = TRUE,
+    recursive = TRUE
+  )
+
+run_names <-
+  stringr::str_extract_all(filenames, "SRR\\d+", simplify = TRUE)
+
+counts <-  tximport(files = filenames,
+                     type = "kallisto",
+                     txOut = TRUE,
+  ) 
+
+exp <- as.data.frame(counts$counts) %>%
+    setNames(run_names)
+```
+
+
+
+Antes de tudo, devemos criar um dicionário para o transcriptogramer, com os identificadores de proteína em uma coluna - formatados da mesma forma encontrada no ordenamento - e os identificadores dos genes em outra.
+
+```{r}
+ensembl <-
+    useEnsembl(biomart = "genes", dataset = "hsapiens_gene_ensembl", mirror="useast")
+
+translated <- getBM(
+    attributes = c('ensembl_peptide_id',
+                   'ensembl_transcript_id_version'),
+    filters = 'ensembl_transcript_id_version',
+    values = rownames(exp),
+    mart = ensembl
+  )
+
+
+dicionario <- translated %>% 
+  filter(ensembl_peptide_id != "") %>% 
+  mutate(ensembl_peptide_id = paste0("9606.", ensembl_peptide_id))
+
+exp_filtered <- exp %>% 
+  filter(rownames(exp) %in% dicionario$ensembl_transcript_id_version)
+```
+
+Primeiro, criaremos o objeto contendo a informação de ligação entre as proteínas e também o ordenamento delas.
+
+```{r}
+t <- transcriptogramPreprocess(association = association, ordering = Hs900, radius = 80)
+```
+
+Em seguida, utilizamos a nossa matriz de contagens para formar o transcriptograma.
+
+```{r}
+t2 <- transcriptogramStep1(object = t, expression = exp_filtered,
+                          dictionary = dicionario, nCores = 1)
+```
+
+```{r}
+t3 <- transcriptogramStep2(object = t2, nCores = 1)
+```
+
+## Plots
+
+Por fim, podemos fazer um plot com os genes diferencialmente expressos e os clusters encontrados.
+
+```{r}
+# Contrastes 
+
+levels <- c(rep(FALSE, 4), rep(TRUE, 4))
+
+# Atenção: Mudar p-valor
+
+t_diff <- differentiallyExpressed(object = t3, levels = levels, pValue = 1,
+                             trend = FALSE, title = "radius 80")
+```
+
+```{r}
+rdp <- clusterVisualization(object = t_diff)
+```
+
+```{r}
+t_enrich <- clusterEnrichment(object = t, species = HsBPTerms,
+                           pValue = 0.005, nCores = 1)
+```
+
