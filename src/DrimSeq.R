@@ -66,7 +66,9 @@ metadata <- vroom("data/subset_metadata.tsv") %>%
   as.data.frame()
 
 counts_df <- get_count_df(filenames) %>%
-  filter(if_all(starts_with("SRR"), ~ .x > 0))
+  filter(if_all(starts_with("SRR"), ~ .x > 0)) %>%
+  # Remover linha que dá erro no optim
+  dplyr::slice(-c(276))
 
 d <- dmDSdata(counts = counts_df, samples = metadata)
 
