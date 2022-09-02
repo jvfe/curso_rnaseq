@@ -12,8 +12,9 @@ knitr::opts_chunk$set(echo = TRUE)
 ```{r}
 library(RCurl)
 library(dplyr)
-library(igraph)
 library(RedeR)
+library(igraph)
+library(biomaRt)
 ```
 
 # Introdução
@@ -43,9 +44,22 @@ get_map <- function(ids) {
 Vamos adquirir a rede completa para o nosso conjunto de genes:
 
 ```{r}
-expression <- readr::read_csv("results/GSE116127.csv")
+load("results/res_dge.RData")
 
-interaction <- get_map(expression$hgnc_symbol)
+ensembl <-
+    useEnsembl(biomart = "genes", dataset = "hsapiens_gene_ensembl", mirror="useast")
+
+translated <- getBM(
+    attributes = c('hgnc_symbol',
+                   'ensembl_gene_id'),
+    filters = 'ensembl_gene_id',
+    values = rownames(res_dge),
+    mart = ensembl
+  )
+
+identifiers <- paste0(unique(translated$hgnc_symbol), collapse = "%0d")
+
+interaction <- get_map(identifiers)
 
 ```
 
