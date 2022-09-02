@@ -51,10 +51,9 @@ enrich_to_GO <- function(genelist, padj_cutoff = 0.1) {
 }
 
 # Ler dado de expressão
-dge_results <- readr::read_csv("results/GSE116127.csv") %>%
-  dplyr::filter(padj < 0.01)
+load("results/res_dge.RData")
 
-enriched <- enrich_to_GO(dge_results$row)
+enriched <- enrich_to_GO(rownames(res_dge))
 
 ```
 
