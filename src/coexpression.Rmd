@@ -1,0 +1,123 @@
+---
+title: "CoExpression Networks"
+author: "João Vitor F. Cavalcante"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(CEMiTool)
+library(DESeq2)
+library(dplyr)
+library(biomaRt)
+```
+
+# CemiTool
+
+## Ler dados de expressão
+
+```{r}
+# Carregar dado de expressão
+load("./results/dds.RData")
+
+# Carregar genes DGE
+load("./results/res_dge.RData")
+
+metadata <- readr::read_csv("data/metadata.txt") %>% 
+  dplyr::filter(Run %in% colnames(dds)) %>% 
+  dplyr::select(Run, subtype) %>% 
+  as.data.frame()
+
+# Obter expressão normalizada e filtrar genes DGE
+vst <- vst(dds)
+counts <- assay(vst)
+counts <- as.data.frame(counts[rownames(counts) %in% rownames(res_dge),])
+```
+
+## Traduzir identificadores
+
+```{r}
+ensembl <- useMart("ENSEMBL_MART_ENSEMBL")
+
+ensembl <- useDataset(dataset = "hsapiens_gene_ensembl", mart = ensembl)
+
+ids <- getBM(attributes = c("hgnc_symbol", "ensembl_gene_id", "ensembl_peptide_id", "entrezgene_id"),
+             filters = "ensembl_gene_id",
+             values = rownames(counts),
+             mart = ensembl)
+```
+
+
+
+## Rodar o CEMiTool
+
+```{r}
+cem <- cemitool(counts, annot = metadata, sample_name_column = "Run", class_column = "subtype")
+```
+
+
+## Número de módulos encontrados
+
+```{r}
+nmodules(cem)
+
+head(module_genes(cem))
+```
+
+## Identificar top n genes com maior conectivadade em cada módulo
+
+```{r}
+n <- 10
+
+hubs <- get_hubs(cem, n)
+
+hubs
+```
+
+## Enriquecimento dos módulos
+
+The size and intensity of the circles in the figure correspond to the Normalised Enrichment Score (NES), which is the enrichment score for a module in each class normalised by the number of genes in the module
+
+```{r}
+# generate heatmap of gene set enrichment analysis
+gsea <- mod_gsea(cem)
+gsea_plot <- plot_gsea(gsea)
+show_plot(gsea_plot, "gsea")
+```
+
+
+## Visualizar padrões de expressão nos módulos
+
+```{r}
+# plot gene expression within each module
+profile_cem <- plot_profile(cem)
+plots <- show_plot(profile_cem, "profile")
+plots[1]
+```
+
+# Over-representation analysis
+
+Necessita um arquivo GMT com as vias e os genes correspondentes, aqui utilizaremos um fornecido
+pelo pacote CEMiTool.
+
+```{r}
+# read GMT file
+gmt_fname <- system.file("extdata", "pathways.gmt", package = "CEMiTool")
+gmt_in <- read_gmt(gmt_fname) %>% 
+  dplyr::inner_join(ids, by = c("gene" = "hgnc_symbol")) %>% 
+  dplyr::select(term, ensembl_gene_id) %>% 
+  rename(gene = ensembl_gene_id)
+
+ora <- mod_ora(cem, gmt_in)
+```
+
+```{r}
+ora_plot <- plot_ora(ora)
+plots <- show_plot(ora_plot, "ora")
+plots[1]
+```
+
