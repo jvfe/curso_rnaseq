@@ -17,9 +17,19 @@ library(biomaRt)
 library(org.Hs.eg.db)
 ```
 
-# CemiTool
+# CEMiTool
+
+O pacote Bioconductor CEMiTool (Co-Expression Modules identification Tool) fornece aos
+seus usuários uma maneira simples de realizar análises de co-expressão, encontrando módulos
+gênicos que representam a correlação da expressão entre os genes.
+
+Além disso, o CEMiTool permite integrar outras informações, como vias metabólicas do KEGG, para
+se realizar um enriquecimento funcional e interações da rede proteína-proteína dos genes a serem analisados, permitindo a construção de uma rede que ilustre os resultados da co-expressão.
 
 ## Ler dados de expressão
+
+Primeiro, iremos ler o dado de expressão dos genes diferencialmente expressos e as informações
+da tabela de metadados, que inclui os grupos ou contrastes.
 
 ```{r}
 # Carregar dado de expressão
@@ -51,6 +61,12 @@ ids <- getBM(attributes = c("hgnc_symbol", "ensembl_gene_id", "ensembl_peptide_i
              values = rownames(counts),
              mart = ensembl)
 ```
+
+## Adquirir vias do KEGG
+
+Para isso, usaremos o org.Hs.db, especificamente o org.Hs.egPATH2EG, que possui uma lista
+de vias do KEGG e os Entrez gene IDs associados a cada, que podemos então cruzar com nosso
+dado de expressão.
 
 ```{r}
 kegg_to_entrez <- as.data.frame(org.Hs.egPATH2EG)
@@ -140,6 +156,11 @@ save(int_network, file="results/network_for_cea.RData")
 
 ## Rodar o CEMiTool
 
+A função cemitool() é a função mestra do pacote, é por meio dela que iremos obter o objeto com
+os módulos de co-expressão e as figuras. Para isso, adicionaremos, é claro, nosso dado de expressão,
+mas também nossos contrastes - especificando em qual coluna está o nome de cada amostra (Run) e o nome
+dos contrastes (subtype) -, nossas vias metabólicas, e nossas interações.
+
 ```{r}
 load("results/network_for_cea.RData")
 load("results/pathways_for_cea.RData")
@@ -163,7 +184,10 @@ cem <-
 ```
 
 
-## Número de módulos encontrados
+## Investigação inicial do resultado
+
+Primeiro, podemos ver quantos módulos foram encontrados com a função nmodules(),
+e também alguns dos genes que compoem cada módulo através da função module_genes().
 
 ```{r}
 nmodules(cem)
@@ -171,7 +195,7 @@ nmodules(cem)
 head(module_genes(cem))
 ```
 
-## Identificar top n genes com maior conectivadade em cada módulo
+Podemos também ver quais genes possuem a maior conectividade.
 
 ```{r}
 n <- 10
@@ -183,7 +207,9 @@ hubs
 
 ## Enriquecimento dos módulos
 
-The size and intensity of the circles in the figure correspond to the Normalised Enrichment Score (NES), which is the enrichment score for a module in each class normalised by the number of genes in the module
+Como fornecemos as informações dos contrastes, a função cemitool também realizou um *gene set enrichment analysis*, usando a função do pacote *fgsea*. A figura associada a esse resultado possui um círculo em 
+cada módulo e em cada contraste, com a intensidade e o tamanho de cada círculo correspondendo ao Score de enriquecimento normalizado (NES), que é o score de enriquecimento para o módulo em cada classe 
+normalizado pelo número de genes do módulo.
 
 ```{r}
 # generate heatmap of gene set enrichment analysis
@@ -193,6 +219,8 @@ show_plot(cem, "gsea")
 
 ## Visualizar padrões de expressão nos módulos
 
+Também podemos visualizar o padrão de expressão de cada gene em cada módulo.
+
 ```{r}
 # plot gene expression within each module
 plots <- show_plot(cem, "profile")
@@ -201,6 +229,9 @@ plots[1]
 
 ## Over-representation analysis
 
+A função cemitool também determina se as vias metabólicas estão associadas com os módulos através
+de uma *over-representation analysis*.
+
 ```{r}
 plots <- show_plot(cem, "ora")
 plots[1]
@@ -208,10 +239,20 @@ plots[1]
 
 ## Interações
 
+E, dado que fornecemos a informação das interações entre nossos genes, também podemos gerar a imagem
+de uma rede que combina a informação das interações junto aos resultados da análise de co-expressão.
+
 ```{r}
 plots <- show_plot(cem, "interaction") # view the plot for the first module
 plots[1]
 ```
+
+## Gerando relatório
+
+Todos os resultados encontrados pelo pacote CEMiTool na nossa análise, além de todos os parâmetros
+que utilizamos, podem ser facilmente salvos e compartilhados através de um relatório HTML, que se gera
+com a função generate_report(). Tente ir ao diretório escolhido abaixo e abrir o arquivo HTML com seu
+navegador!
 
 ```{r}
 # Cria relatorio do CEMiTool em HTML no diretório abaixo
