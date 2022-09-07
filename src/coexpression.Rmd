@@ -14,6 +14,7 @@ library(CEMiTool)
 library(DESeq2)
 library(dplyr)
 library(biomaRt)
+library(org.Hs.eg.db)
 ```
 
 # CemiTool
@@ -51,12 +52,114 @@ ids <- getBM(attributes = c("hgnc_symbol", "ensembl_gene_id", "ensembl_peptide_i
              mart = ensembl)
 ```
 
+```{r}
+kegg_to_entrez <- as.data.frame(org.Hs.egPATH2EG)
+
+kegg_to_symbol <- ids %>% 
+  mutate(entrezgene_id = as.character(entrezgene_id)) %>% 
+  inner_join(kegg_to_entrez, by = c("entrezgene_id" = "gene_id"))
+
+save(kegg_to_symbol, file="results/pathways_for_cea.RData")
+```
+
+## Adquirir interações PPI
+
+```{r}
+# Para fazer este mapeamento, quando submetemos uma requisição à API do string programaticamente, 
+# temos que concatenar os identificadores e separá-los com o símbolo "%0d".
+genes_hgnc_concatenado <- paste0(ids$hgnc_symbol, collapse = "%0d") 
+
+# Fazer a solicitação a API do STRING
+req <- RCurl::postForm(
+  "https://string-db.org/api/tsv/get_string_ids",
+  identifiers = genes_hgnc_concatenado,
+  echo_query = "1",
+  species = "9606"
+)
+map_ids <- read.table(text = req, sep = "\t", header = T, quote = "")
+```
+
+
+```{r}
+# Função para combinar os scores de acordo com o algoritmo usado pelo STRING
+combinescores <- function(dat, evidences = "all", confLevel = 0.4) {
+  if(evidences[1] == "all"){
+    edat<-dat[,-c(1,2,ncol(dat))]
+  } else {
+    if(!all(evidences%in%colnames(dat))){
+      stop("NOTE: one or more 'evidences' not listed in 'dat' colnames!")
+    }
+    edat<-dat[,evidences]
+  }
+  if (any(edat > 1)) {
+    edat <- edat/1000
+  }
+  edat<-1-edat
+  sc<- apply(X = edat, MARGIN = 1, FUN = function(x) 1-prod(x))
+  dat <- cbind(dat[,c(1,2)],combined_score = sc)
+  idx <- dat$combined_score >= confLevel
+  dat <-dat[idx,]
+  return(dat)
+}
+
+#Concatenar os identificadores do string para a requisição
+genes_string_concatenado <- paste0(unique(map_ids$stringId), collapse = "%0d") 
+
+# Requisição para o método 'network'
+req2 <- RCurl::postForm(
+  "https://string-db.org/api/tsv/network",
+  identifiers = genes_string_concatenado, # identificadores do stringID, obtidos na etapa anterior
+  required_core = "0", # score mínimo para cada interação
+  species     = "9606" # espécie (H. sapiens)
+)
+int_network <- read.table(text = req2, sep = "\t", header = T)
+int_network <- unique(int_network)
+
+int_network <- combinescores(int_network, evidences = c("ascore", "escore", "dscore"), confLevel = 0.9)
+```
+
+
+```{r}
+# Remover o identificador de espécie em cada ENSP
+int_network$stringId_A <- substring(int_network$stringId_A, 6, 1000)
+int_network$stringId_B <- substring(int_network$stringId_B, 6, 1000)
+
+# Filtrar a rede, mantendo apenas os ENSP que estão presentes no nosso dataframe inicial
+idx1 <- int_network$stringId_A %in% ids$ensembl_peptide_id
+idx2 <- int_network$stringId_B %in% ids$ensembl_peptide_id
+int_network <- int_network[idx1 & idx2,]
+
+# Manter somente os nomes dos genes na tabela de interação
+int_network$ENSG_A <- ids$ensembl_gene_id[match(int_network$stringId_A, ids$ensembl_peptide_id)]
+int_network$ENSG_B <- ids$ensembl_gene_id[match(int_network$stringId_B, ids$ensembl_peptide_id)]
+int_network <- int_network[, c("ENSG_A", "ENSG_B")]
+
+save(int_network, file="results/network_for_cea.RData")
+```
 
 
 ## Rodar o CEMiTool
 
 ```{r}
-cem <- cemitool(counts, annot = metadata, sample_name_column = "Run", class_column = "subtype")
+load("results/network_for_cea.RData")
+load("results/pathways_for_cea.RData")
+
+paths <- kegg_to_symbol[, c("path_id", "ensembl_gene_id")]
+
+paths <- setNames(paths, c("term", "gene"))
+
+cem <-
+  cemitool(
+    counts,
+    annot = metadata,
+    sample_name_column = "Run",
+    class_column = "subtype",
+    paths,
+    interactions = int_network,
+    filter = TRUE,
+    plot = TRUE,
+    verbose = TRUE
+  )
 ```
 
 
@@ -84,9 +187,7 @@ The size and intensity of the circles in the figure correspond to the Normalised
 
 ```{r}
 # generate heatmap of gene set enrichment analysis
-gsea <- mod_gsea(cem)
-gsea_plot <- plot_gsea(gsea)
-show_plot(gsea_plot, "gsea")
+show_plot(cem, "gsea")
 ```
 
 
@@ -94,30 +195,22 @@ show_plot(gsea_plot, "gsea")
 
 ```{r}
 # plot gene expression within each module
-profile_cem <- plot_profile(cem)
-plots <- show_plot(profile_cem, "profile")
+plots <- show_plot(cem, "profile")
 plots[1]
 ```
 
-# Over-representation analysis
-
-Necessita um arquivo GMT com as vias e os genes correspondentes, aqui utilizaremos um fornecido
-pelo pacote CEMiTool.
+## Over-representation analysis
 
 ```{r}
-# read GMT file
-gmt_fname <- system.file("extdata", "pathways.gmt", package = "CEMiTool")
-gmt_in <- read_gmt(gmt_fname) %>% 
-  dplyr::inner_join(ids, by = c("gene" = "hgnc_symbol")) %>% 
-  dplyr::select(term, ensembl_gene_id) %>% 
-  rename(gene = ensembl_gene_id)
-
-ora <- mod_ora(cem, gmt_in)
-```
-
-```{r}
-ora_plot <- plot_ora(ora)
-plots <- show_plot(ora_plot, "ora")
+plots <- show_plot(cem, "ora")
 plots[1]
 ```
+
+## Interações
+
+```{r}
+plots <- show_plot(cem, "interaction") # view the plot for the first module
+plots[1]
+```
+
 
