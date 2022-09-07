@@ -213,4 +213,9 @@ plots <- show_plot(cem, "interaction") # view the plot for the first module
 plots[1]
 ```
 
+```{r}
+# Cria relatorio do CEMiTool em HTML no diretório abaixo
+# (Tem que ser um diretório inexistente)
+generate_report(cem, directory="results/cemitool_report/")
+```
 
