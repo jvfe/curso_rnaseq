@@ -783,10 +783,10 @@
     },
     "aplot": {
       "Package": "aplot",
-      "Version": "0.1.6",
+      "Version": "0.1.7",
       "Source": "Repository",
       "Repository": "CRAN",
-      "Hash": "f33f09b723d25086d5373d996be34cc3",
+      "Hash": "c827e1724f09b5a8696972803adb1d26",
       "Requirements": [
         "ggfun",
         "ggplot2",
@@ -2454,10 +2454,10 @@
     },
     "scatterpie": {
       "Package": "scatterpie",
-      "Version": "0.1.7",
+      "Version": "0.1.8",
       "Source": "Repository",
       "Repository": "CRAN",
-      "Hash": "f4d12f5fdf169e10739fe554e7705159",
+      "Hash": "49c8628a96243f66d30d58c898a2c6db",
       "Requirements": [
         "ggforce",
         "ggfun",
@@ -2727,10 +2727,10 @@
     },
     "tweenr": {
       "Package": "tweenr",
-      "Version": "2.0.1",
+      "Version": "2.0.2",
       "Source": "Repository",
       "Repository": "CRAN",
-      "Hash": "0c5c4f474477e19c01e0c559cc440888",
+      "Hash": "c16efcef4c72d3bff5e65031f3f1f841",
       "Requirements": [
         "cpp11",
         "farver",
